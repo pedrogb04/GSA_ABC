@@ -27,7 +27,7 @@ class ABC:
         self.real_boundaries = np.array(boundaries["real"])
         self.discrete_boundaries = np.array(boundaries["discrete"])
 
-        # Límite de intentos antes de que una fuente de comida se agote (para abejas exploradoras)
+        # Límite de intentos antes de que una fuente de comida se agote
         self.limit = limit
 
         self.solution_history = None
@@ -76,7 +76,7 @@ class ABC:
             "discrete": np.copy(pos["discrete"][i]),
         }
 
-        # 1. Perturbación de variables REALES (Hiperparámetros)
+        # Perturbación de variables REALES (Hiperparámetros)
         if self.r_dim > 0:
             phi_r = np.random.uniform(low=-1, high=1, size=self.r_dim)
             new_solution["real"] = pos["real"][i] + phi_r * (
@@ -89,16 +89,14 @@ class ABC:
                 self.real_boundaries[:, 1],
             )
 
-        # 2. Perturbación de variables DISCRETAS (Features)
+        # Perturbación de variables DISCRETAS (Features)
         if self.d_dim > 0:
             phi_d = np.random.uniform(low=-1, high=1, size=self.d_dim)
             step = phi_d * (pos["discrete"][i] - pos["discrete"][k])
 
-            # Convertimos el "paso" en una probabilidad usando tanh, igual que el BGSA
             move_probs = np.abs(np.tanh(step))
             rand = np.random.rand(self.d_dim)
 
-            # Volteamos el bit si el aleatorio supera la probabilidad
             flip_mask = rand < move_probs
             new_solution["discrete"][flip_mask] = (
                 1 - new_solution["discrete"][flip_mask]
@@ -108,10 +106,10 @@ class ABC:
         if not np.any(new_solution["discrete"]):
             new_solution["discrete"][np.random.randint(0, self.d_dim)] = 1
 
-        # 3. Comprobación de viabilidad y reparación
+        # Comprobación de viabilidad y reparación
         if not self.is_feasible(new_solution):
             if not repair_solution:
-                # Recorte básico
+
                 new_solution["real"] = np.clip(
                     new_solution["real"],
                     self.real_boundaries[:, 0],
@@ -123,8 +121,7 @@ class ABC:
                     self.discrete_boundaries[:, 1],
                 ).astype(int)
             else:
-                # Usa la misma lógica de reparación pesada del GSA si fuera necesario
-                pass  # Aquí podrías inyectar el código de _repair_solution si tu problema tiene restricciones complejas
+                pass
 
         return new_solution
 
@@ -164,7 +161,7 @@ class ABC:
         trials: np.ndarray,
         repair_solution: bool,
     ) -> None:
-        """Fase 2: Las abejas observadoras eligen fuentes de comida basadas en su fitness (Ruleta)."""
+        """Onlooker bees phase"""
         fit_norm = fit - np.min(fit)
         sum_fit = np.sum(fit_norm)
         probs = fit_norm / sum_fit if sum_fit != 0 else np.ones(n_employed) / n_employed
@@ -199,7 +196,7 @@ class ABC:
         accs: np.ndarray,
         trials: np.ndarray,
     ) -> None:
-        """Fase 3: Las abejas exploradoras reemplazan fuentes agotadas por nuevas aleatorias."""
+        """Scout bees phase"""
         for i in range(n_employed):
             if trials[i] > self.limit:
                 new_pos = self._get_initial_positions(1)
@@ -213,13 +210,12 @@ class ABC:
     def optimize(
         self, population_size: int, iters: int, repair_solution: bool = False
     ) -> pd.DataFrame:
-        # El número de abejas empleadas es igual al tamaño de la población (fuentes de comida)
         n_employed = population_size
 
         pos = self._get_initial_positions(n_employed)
         fit = np.zeros(n_employed)
         accs = np.zeros(n_employed)
-        trials = np.zeros(n_employed)  # Contador de fallos para las exploradoras
+        trials = np.zeros(n_employed)
 
         g_best = {"real": np.zeros(self.r_dim), "discrete": np.zeros(self.d_dim)}
         g_best_score = float("-inf")
@@ -268,9 +264,7 @@ class ABC:
 
             self._scout_bees_phase(n_employed, pos, fit, accs, trials)
 
-            # -----------------------------------------------------
-            # Actualización del Mejor Global y Logging
-            # -----------------------------------------------------
+            # Actualización del Mejor Global
             for i in range(n_employed):
                 if fit[i] > g_best_score:
                     g_best_score = fit[i]
